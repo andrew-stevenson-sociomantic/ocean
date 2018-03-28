@@ -27,7 +27,7 @@ import ocean.core.Exception;
 
 import  Integer = ocean.text.convert.Integer_tango;
 
-import ocean.stdc.string : memchr;
+import ocean.stdc.string : strpbrk;
 
 version ( UnitTest )
 {
@@ -568,6 +568,9 @@ class Uri : UriView
                 Params:
                     s = the potentially encoded string
                     ignore = a character that will be left % encoded
+                    plus_expand = if unescaped + characters should be replaced
+                        with spaces. This should probably be true iff you
+                        are decoding a query string.
 
                 Returns:
                     the expanded string. this may be a slice over an internal
@@ -576,7 +579,8 @@ class Uri : UriView
 
         ***********************************************************************/
 
-        private cstring decoder (cstring s, char ignore=0)
+        private cstring decoder (cstring s, char ignore=0,
+                bool plus_expand=false)
         {
                 static int toInt (char c)
                 {
@@ -593,8 +597,16 @@ class Uri : UriView
 
                 auto length = s.length;
 
-                // take a peek first, to see if there's work to do
-                if (length && memchr (s.ptr, '%', length))
+                // first check if there is work to be done. to do that we
+                // check if any characters that may need unescaping are
+                // present. that is '%' and, depending on plus_expand, '+'
+                const cstring escape_chars = "+%";
+                if (length && strpbrk(s.ptr,
+                            (plus_expand ?
+                                escape_chars.ptr
+                                :
+                                escape_chars.ptr + 1)
+                        ))
                    {
                    char* p;
                    int   j;
@@ -618,6 +630,10 @@ class Uri : UriView
                               c = '%';
                           else
                              i += 2;
+                          }
+                       else if (c == '+')
+                          {
+                          c = ' ';
                           }
 
                        *p = cast(char) c;
@@ -707,7 +723,7 @@ class Uri : UriView
                 if (mark < len && uri[mark] is '?')
                    {
                    for (++mark, i=mark; i < len && uri[i] != '#'; ++i) {}
-                   query_ = decoder (uri[mark .. i], '&');
+                   query_ = decoder (uri[mark .. i], '&', true);
                    mark = i;
                    }
 
@@ -1003,7 +1019,14 @@ unittest
         test(query == "what");
         test!("==") (toString(), "psyc://example.net/~marenz?what#_presence");
 
-    }
+        parse("http://server:8080/path?q1=a+b&q2=a%20b&q3=a%2bb");
+
+        test!("==")(scheme, "http");
+        test!("==")(host, "server");
+        test!("==")(port, 8080);
+        test!("==")(path, "/path");
+        test!("==")(query, "q1=a b&q2=a b&q3=a+b");
+    }   
 
     //Cout (uri).newline;
     //Cout (uri.encode ("&#$%", uri.IncQuery)).newline;
