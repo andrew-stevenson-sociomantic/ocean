@@ -565,6 +565,15 @@ class Uri : UriView
                 The decoded strings are placed into a thread-safe expanding
                 buffer, and a slice of it is returned to the caller.
 
+                Params:
+                    s = the potentially encoded string
+                    ignore = a character that will be left % encoded
+
+                Returns:
+                    the expanded string. this may be a slice over an internal
+                    buffer and will not be valid after reset is called (i.e.
+                    the next URI is parsed).
+
         ***********************************************************************/
 
         private cstring decoder (cstring s, char ignore=0)
